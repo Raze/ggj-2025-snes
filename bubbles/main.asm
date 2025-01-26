@@ -151,20 +151,44 @@ input_loop:
    lda $4212
    bit #$0001
    bne input_loop
-   lda JOY1L
-;
-;   lda JOY1L
-;   sta Joy1A
-;   bit KEY_DOWN
-;   beq @down_not_pressed
-;      lda aim_y
-;      inc
-;      sta aim_y
-;@down_not_pressed:
+   lda JOY1H
+   sta Joy1A
+
+   ; Update Aim
+
+   bit #$04 ; KEY_DOWN
+   beq Down_not_held
+      lda aim_y
+      inc
+      sta aim_y
+Down_not_held:
+
+   lda Joy1A
+   bit #$08 ; KEY_UP
+   beq Up_not_held
+      lda aim_y
+      dec
+      sta aim_y
+Up_not_held:
+
+   lda Joy1A
+   bit #$02 ; KEY_LEFT
+   beq Left_not_held
+      lda aim_x
+      dec
+      sta aim_x
+Left_not_held:
+
+   lda Joy1A
+   bit #$01 ; KEY_RIGHT
+   beq Right_not_held
+      lda aim_x
+      inc
+      sta aim_x
+Right_not_held:
+
+
    ldx aim_obj
-   lda aim_x
-   inc
-   sta aim_x
    lda aim_x
    sta oam_lo_buffer, x
    lda aim_y
@@ -177,7 +201,7 @@ BubbleUpdateLoop:
    inx
    ; Read Y
    lda oam_lo_buffer, x
-   inc
+   dec
    sta oam_lo_buffer, x
    inx
    inx
