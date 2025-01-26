@@ -25,8 +25,13 @@ oam_buffer_end:
 .segment "CODE"
    jmp start
 
+Joy1A          = $06CE
+Joy1B          = $06CF
+aim_x           = $06D0
+aim_y           = $06D1
 
-VBLCOUNT       = $06D0
+BubbleStart = $0004
+BubbleCount = $000A
 
 VRAM_CHARSET   = $0000 ; must be at $1000 boundary
 VRAM_BG1       = $1000 ; must be at $0400 boundary
@@ -39,6 +44,19 @@ START_TM_ADDR  = VRAM_BG1 + 32*START_Y + START_X
 
 hello_str: .asciiz "You can do it!"
 
+KEY_B = $8000
+KEY_Y = $4000
+KEY_SELECT = $2000
+KEY_START = $1000
+KEY_UP = $0800
+KEY_DOWN = $0400
+KEY_LEFT = $0200
+KEY_RIGHT = $0100
+KEY_A = $0080
+KEY_X = $0040
+KEY_L = $0020
+KEY_R = $0010
+
 start:
    clc             ; native mode
    xce
@@ -48,7 +66,7 @@ start:
    ; Clear registers
    ldx #$33
 
-   stz VBLCOUNT
+   stz aim_y
 
    jsr ClearVRAM
    jsr ClearOAM
@@ -113,28 +131,45 @@ start:
    bra @string_loop
 
 @enable_display:
-   ; Show BG1
+   ; Show BG1 + Sprites
    lda #%00010001
    sta TM
    ; Maximum screen brightness
    lda #$0F
    sta INIDISP
 
-   ; enable NMI for Vertical Blank
-   lda #$80
+   ; enable NMI and Auto Joypad read for Vertical Blank
+   lda #%10000001 ; Enable NMI and Auto Joypad read
    sta NMITIMEN
 
 game_loop:
    wai ; Pause until next interrupt complete (i.e. V-blank processing is done)
-   ; Do something
-   lda VBLCOUNT
-   clc
-   adc #$02
-   sta VBLCOUNT
+   ; jsr read_input
+;   rep #$20
+input_loop:
+   lda $4212
+   bit #$0001
+   bne input_loop
+;
+;   lda JOY1L
+;   sta Joy1A
+;   bit KEY_DOWN
+;   beq @down_not_pressed
+;      lda aim_y
+;      inc
+;      sta aim_y
+;@down_not_pressed:
+   lda aim_x
+   inc
+   sta aim_x
+   lda aim_x
    sta oam_lo_buffer
+   lda aim_y
+   ldx #01
+   sta oam_lo_buffer + 1
+
    jsr CpyToDMA
    jmp game_loop
-
 
 nmi:
    rep #$10        ; X/Y 16-bit
@@ -164,7 +199,7 @@ ClearVRAM:
    phx
    php
 
-   REP #$30		; mem/A = 8 bit, X/Y = 16 bit
+   REP #$30          ; mem/A = 8 bit, X/Y = 16 bit
    SEP #$20
 
    LDA #$80
@@ -217,17 +252,56 @@ SetAllSpritesOutside_Loop:
 
    ; Setup Tile
    ldx #$42
-	stx oam_lo_buffer
-	; Set sprite 0 Y position
-	ldx #$67
-	stx oam_lo_buffer + 1
-	; Set sprite 0 to priority 3 and tile 0x01
-	ldx #((%00110000 << 8) | $0001)
-	stx oam_lo_buffer + 2
+   stx oam_lo_buffer
+   ; Set sprite 0 Y position
+   ldx #$67
+   stx oam_lo_buffer + 1
+   ; Set sprite 0 to priority 3 and tile 0x01
+   ldx #((%00110000 << 8) | $0001)
+   stx oam_lo_buffer + 2
 
-	; Set sprite 0 to be large (16x16)
-	lda #%00000010
-	sta oam_hi_buffer
+   ; Set sprite 0 to be large (16x16)
+   lda #%00000010
+   sta oam_hi_buffer
+
+   ; Write X
+   ldx #BubbleStart
+   lda #$19
+BubbleInit_loop_x:
+   sta oam_lo_buffer, X
+   inx
+   inx
+   inx
+   inx
+   clc
+   adc #$19
+   cpx #(BubbleStart + (BubbleCount * 4))
+   bne BubbleInit_loop_x
+
+   ; Write Y
+   ldx #(BubbleStart + 1)
+   lda #$18
+BubbleInit_loop_y:
+   sta oam_lo_buffer, X
+   inx
+   inx
+   inx
+   inx
+   cpx #(BubbleStart + (BubbleCount * 4) + 1)
+   bne BubbleInit_loop_y
+
+   ldx #(BubbleStart + 2)
+   REP #$20
+   ldy #((%00110000 << 8) | $0011)
+   tya
+BubbleInit_loop_attr:
+   sta oam_lo_buffer, X
+   inx
+   inx
+   inx
+   inx
+   cpx #(BubbleStart + (BubbleCount * 4) + 2)
+   bne BubbleInit_loop_attr
 
    plp
    plx
@@ -240,26 +314,35 @@ CpyToDMA:
    phx
    php
 
-	; Copy OAM data via DMA
-	stz OAMADDL
-	lda #%00000000
-	sta $4310 ; DMAP1
-	lda #<OAMDATA
-	sta $4311 ; BBAD1
-	ldx #.loword(oam_lo_buffer)
-	stx $4312 ; A1T1L
-	lda #^oam_lo_buffer
-	sta $4314 ; A1B1
-	ldx #(oam_buffer_end - oam_lo_buffer)
-	stx $4315 ; DAS1L
-	lda #%00000010
-	sta MDMAEN
+   ; Copy OAM data via DMA
+   stz OAMADDL
+   lda #%00000000
+   sta $4310 ; DMAP1
+   lda #<OAMDATA
+   sta $4311 ; BBAD1
+   ldx #.loword(oam_lo_buffer)
+   stx $4312 ; A1T1L
+   lda #^oam_lo_buffer
+   sta $4314 ; A1B1
+   ldx #(oam_buffer_end - oam_lo_buffer)
+   stx $4315 ; DAS1L
+   lda #%00000010
+   sta MDMAEN
 
    plp
    plx
    pla
    rts
 
+   
+
+;read_input:
+;   lda JOY1L
+;   sta Joy1A
+;   lda JOY1H
+;   sta Joy1B
+;   rts
+;
 
 .include "charset.asm"
 
