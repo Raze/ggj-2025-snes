@@ -27,6 +27,7 @@ oam_buffer_end:
 
 Joy1A          = $06CE
 Joy1B          = $06CF
+aim_obj        = $0000
 aim_x           = $06D0
 aim_y           = $06D1
 
@@ -150,6 +151,7 @@ input_loop:
    lda $4212
    bit #$0001
    bne input_loop
+   lda JOY1L
 ;
 ;   lda JOY1L
 ;   sta Joy1A
@@ -159,14 +161,30 @@ input_loop:
 ;      inc
 ;      sta aim_y
 ;@down_not_pressed:
+   ldx aim_obj
    lda aim_x
    inc
    sta aim_x
    lda aim_x
-   sta oam_lo_buffer
+   sta oam_lo_buffer, x
    lda aim_y
-   ldx #01
-   sta oam_lo_buffer + 1
+   inx
+   sta oam_lo_buffer, x
+
+   ; Bubble Update
+   ldx #BubbleStart
+BubbleUpdateLoop:
+   inx
+   ; Read Y
+   lda oam_lo_buffer, x
+   inc
+   sta oam_lo_buffer, x
+   inx
+   inx
+   inx
+   cpx #(BubbleStart + (BubbleCount * 4))
+   bne BubbleUpdateLoop
+   
 
    jsr CpyToDMA
    jmp game_loop
