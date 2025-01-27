@@ -1,7 +1,7 @@
 Entry for Global game jam 2025
 
 Rom made in 65c816 Assembly for the Super Nintendo
-The game project is located in `bubbles/`
+The game project is located in `bubbles/` and most of the magic happens in `bubbles/main.asm`
 
 `snes-dev-main/` and `snes-hello-main/` are example projects uses that my code is heavily base on `snes-hello-main/`.
 Other resources uses include
