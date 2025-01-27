@@ -147,9 +147,9 @@ start:
    lda spritemap,x
    sta VMDATAL
    inx
-   inx
    lda spritemap,x
    sta VMDATAH
+   inx
    ; inx
    ; inx
    cpx #(spritemap_end - spritemap) ; count * size * tile_size + stride-1
