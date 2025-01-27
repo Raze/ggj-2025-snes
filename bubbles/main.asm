@@ -6,6 +6,7 @@
 
 .include "snes.inc"
 .include "charmap.inc"
+.include "spritemap.inc"
 
 .segment "HEADER"    ; +$7FE0 in file
 .byte "Bubbles     " ; ROM name
@@ -96,6 +97,26 @@ start:
    sta CGDATA
    lda #$42
    sta CGDATA
+   
+   ; Obj Pallet #$00
+   lda #$80
+   sta CGADD
+   stz CGDATA  ; None
+   stz CGDATA
+   lda #$2B    ; Light Blue
+   sta CGDATA
+   lda #$73
+   sta CGDATA
+
+   lda #$6C    ; Dark Blue
+   sta CGDATA
+   lda #$7E
+   sta CGDATA
+
+   lda #$3f    ; Orange
+   sta CGDATA
+   lda #$12
+   sta CGDATA
 
    ; Setup Graphics Mode 0, 8x8 tiles all layers
    stz BGMODE
@@ -117,6 +138,34 @@ start:
    inx
    cpx #(128*8)
    bne @charset_loop
+
+   ldx #0
+
+   ; Note there is a bug here causing the color indexes to be offset
+   ; This was fixed by just offsetting the palette
+@spritetile_loop_low:
+   lda spritemap,x
+   sta VMDATAL
+   inx
+   inx
+   lda spritemap,x
+   sta VMDATAH
+   ; inx
+   ; inx
+   cpx #(spritemap_end - spritemap) ; count * size * tile_size + stride-1
+   bne @spritetile_loop_low
+   ldx #1
+;@spritetile_loop_high:
+;   lda spritemap,x
+;   sta VMDATAL
+;   inx
+;   inx
+;   lda spritemap,x
+;   sta VMDATAH
+;   inx
+;   inx
+;   cpx #(2*4*8 + 1) ; count * size * tile_size + stride-1
+;   bne @spritetile_loop_high
 
    ; Place string tiles in background
    ldx #START_TM_ADDR
@@ -160,6 +209,7 @@ input_loop:
    beq Down_not_held
       lda aim_y
       inc
+      inc
       sta aim_y
 Down_not_held:
 
@@ -167,6 +217,7 @@ Down_not_held:
    bit #$08 ; KEY_UP
    beq Up_not_held
       lda aim_y
+      dec
       dec
       sta aim_y
 Up_not_held:
@@ -176,6 +227,7 @@ Up_not_held:
    beq Left_not_held
       lda aim_x
       dec
+      dec
       sta aim_x
 Left_not_held:
 
@@ -184,6 +236,9 @@ Left_not_held:
    beq Right_not_held
       lda aim_x
       inc
+      inc
+      ;clc
+      ;adc #$02
       sta aim_x
 Right_not_held:
 
@@ -299,7 +354,7 @@ SetAllSpritesOutside_Loop:
    ldx #$67
    stx oam_lo_buffer + 1
    ; Set sprite 0 to priority 3 and tile 0x01
-   ldx #((%00110000 << 8) | $0001)
+   ldx #((%00110000 << 8) | $0040)
    stx oam_lo_buffer + 2
 
    ; Set sprite 0 to be large (16x16)
